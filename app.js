@@ -13,6 +13,7 @@ const driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
 const session = driver.session();
 
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static('./public'));
 
 app.post("/login", (req, res) => {
   const body = req.body;
@@ -29,12 +30,12 @@ app.post("/login", (req, res) => {
           body.email +
           "',password:'" +
           body.password +
-          "'}) return u.GUID"
+          "'}) return u;"
       )
       .then((result) => {
         if (result.records.length != 0) {
           result.records.forEach((record) => {
-            res.send({ GUID: record._fields[0] });
+            res.send(record._fields[0].properties);
           });
         } else {
           res.send({ GUID: "" });
@@ -103,6 +104,23 @@ app.get('/fields',(req,res)=>{
   .catch(err=>{
     console.log(err);
   })
+});
+
+app.get('/accounts',(req,res)=>{
+  const records=[]
+  session
+  .run(
+    "match(u:User) return u"
+  )
+  .then((result) => {
+      result.records.forEach((record) => {
+        records.push(record._fields[0].properties);
+      });
+      res.send(records);
+  })
+  .catch((err) => {
+    console.log(err);
+  });
 });
 
 app.listen(3000, () => {
