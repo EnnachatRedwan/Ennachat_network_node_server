@@ -13,29 +13,29 @@ const driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
 const session = driver.session();
 
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('./public'));
+app.use(express.static("./public"));
 
-app.post("/login", (req, res) => {
-  const body = req.body;
-  console.log(body);
+app.get("/login", (req, res) => {
+  const headers=req.headers;
+  console.log(headers);
   if (
-    body.email != undefined &&
-    body.email != "" &&
-    body.password != undefined &&
-    body.password != ""
+    headers.email != undefined &&
+    headers.email != "" &&
+    headers.password != undefined &&
+    headers.password != ""
   ) {
     session
       .run(
         "match(u:User{email:'" +
-          body.email +
+        headers.email +
           "',password:'" +
-          body.password +
-          "'}) return u;"
+          headers.password +
+          "'})-[:Specialized_in]->(f) return u,f;"
       )
       .then((result) => {
         if (result.records.length != 0) {
           result.records.forEach((record) => {
-            res.send(record._fields[0].properties);
+            res.send({...record._fields[0].properties,'functionality':record._fields[1].properties["title"]});
           });
         } else {
           res.send({ GUID: "" });
@@ -66,19 +66,9 @@ app.post("/register", (req, res) => {
   ) {
     session
       .run(
-        "merge (:User{email:'" +
-          body.email +
-          "',name:'" +
-          body.name +
-          "',password:'" +
-          body.password +
-          "',name:'" +
-          body.name +
-          "',functionality:'" +
-          body.functionality +
-          "',GUID:'" +
-          guid +
-          "'});"
+        "create (u:User{email:'"+body.email+"',name:'"+body.name+"',password:'"+body.password+"',GUID:'"+guid+"'}) with u "+
+        "match(f:Field{title:'"+body.functionality+"'})"+
+        "create (u)-[:Specialized_in]->(f);"
       )
       .then((result) => {
         res.send({ result: "SC" }); //Successfully created
@@ -92,36 +82,37 @@ app.post("/register", (req, res) => {
   }
 });
 
-app.get('/fields',(req,res)=>{
-  const fields=[];
-  session.run('match(f:Field) return f;')
-  .then(result=>{
-    result.records.forEach(record=>{
-      fields.push(record._fields[0].properties['title']);
+app.get("/fields", (req, res) => {
+  const fields = [];
+  session
+    .run("match(f:Field) return f;")
+    .then((result) => {
+      result.records.forEach((record) => {
+        fields.push(record._fields[0].properties["title"]);
+      });
+      res.send({ fields: fields });
     })
-    res.send({"fields":fields});
-  })
-  .catch(err=>{
-    console.log(err);
-  })
+    .catch((err) => {
+      console.log(err);
+    });
 });
 
-app.get('/accounts',(req,res)=>{
-  const records=[]
+app.get("/accounts", (req, res) => {
+  const records = [];
   session
-  .run(
-    "match(u:User) return u"
-  )
-  .then((result) => {
+    .run("match(u:User) return u")
+    .then((result) => {
       result.records.forEach((record) => {
         records.push(record._fields[0].properties);
       });
       res.send(records);
-  })
-  .catch((err) => {
-    console.log(err);
-  });
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 });
+
+
 
 app.listen(3000, () => {
   console.log("Server launched at port 3000");
